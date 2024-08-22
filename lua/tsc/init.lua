@@ -78,17 +78,18 @@ local function format_notification_msg(msg, spinner_idx)
     return string.format(" %s %s ", config.spinner[spinner_idx], msg)
 end
 
-local total_output = {}
+local errors = {}
+local notify_called = false
 
 M.run = function()
     -- Closed over state
     local tsc = config.bin_path
-    local errors = {}
     local files_with_errors = {}
     local notify_record
-    local notify_called = false
     local spinner_idx = 1
-    total_output = {}
+    local total_output = {}
+
+    errors = {}
 
     if not utils.is_executable(tsc) then
         vim.notify(
@@ -142,7 +143,7 @@ M.run = function()
             ),
             nil,
             get_notify_options(
-                (notify_record and { replace = notify_record.id }),
+                (notify_record and { replace = notify_record.id, on_close = function() notify_record = nil end }),
                 (config.hide_progress_notifications_from_history and notify_called and { hide_from_history = true })
             )
         )
@@ -158,7 +159,7 @@ M.run = function()
         vim.defer_fn(notify, 125)
     end
 
-    if not notify_called then
+    if config.enable_progress_notifications then
         notify()
     end
 
@@ -342,6 +343,8 @@ function M.setup(opts)
     end, { desc = "Close the results qflist", force = true })
 
     if config.flags.watch then
+        -- vim.notify("Type-checking your project via watch mode, hang tight 🚀", nil, get_notify_options())
+
         vim.api.nvim_create_autocmd("BufWritePre", {
             pattern = "*.{ts,tsx}",
             desc = "Run tsc.nvim in watch mode automatically when saving a TypeScript file",
@@ -365,7 +368,7 @@ function M.setup(opts)
 end
 
 function M.get_output()
-    return total_output
+    return errors
 end
 
 return M
